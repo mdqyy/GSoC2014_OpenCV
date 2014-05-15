@@ -1,0 +1,13 @@
+Makefile
+Makefile.Release
+Makefile.Debug
+*.user*
+*.obj
+*.manifest
+*.autosave
+*.exe
+*.properties
+*.cfg
+*~
+
+build/*
