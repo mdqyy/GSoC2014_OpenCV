@@ -16,3 +16,11 @@ set_target_properties(structuredEdgeDetection
 
 set_target_properties(structuredEdgeDetection
                       PROPERTIES PREFIX "") 
+
+if (NOT DEFINED copyTo)
+    set(OUTPUT_COPY_TO "" CACHE STRING "binaries are copied to this directory during post-build" FORCE)
+endif()
+if (NOT "${copyTo}" STREQUAL "")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${copyTo}" CACHE STRING 
+        "The directory into which runtime target files are built" FORCE)
+endif()

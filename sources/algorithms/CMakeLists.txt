@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 2.8.3) 
 project(algorithms)	
     
-add_library(structuredEdgeDetection STATIC structuredEdgeDetection/structuredEdgeDetection.cpp)		
+add_library(algStructuredEdgeDetection STATIC structuredEdgeDetection/structuredEdgeDetection.cpp)		
 
 #-------------------------------------------------------
 #-------------------------------------------------------
 
 set(ALG_LIBS 
-			 structuredEdgeDetection
+			 algStructuredEdgeDetection
 	CACHE INTERNAL "List of libs from algorithm subproject" FORCE)
 			 
 set(ALG_INCLUDE_DIRS 
