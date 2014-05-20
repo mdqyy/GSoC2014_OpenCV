@@ -1,7 +1,7 @@
 My GSoC working repository 
 --------------------------
 
-![alt tag](/motivation.png)
+![alt tag](/motivation.jpg)
 
 ...
 
