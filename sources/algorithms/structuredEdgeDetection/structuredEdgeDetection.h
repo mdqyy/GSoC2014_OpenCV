@@ -11,23 +11,19 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/ml/ml.hpp>
 
+typedef cv::Mat Mat3D; 
+
 class StructuredEdgeDetection
 {
 public:
     CvRTrees __classifier; // random forest trained to detect edges
 
-    void __imresize(const cv::Mat &src, cv::Mat &dst, const cv::Size dstSize);
-    void __imresize(const cv::Mat &src, cv::Mat &dst, const float resizeFactor);
-
-    void __imresize(const cv::Mat &img, const cv::Size dstSize);
-    void __imresize(const cv::Mat &img, const float resizeFactor);
-
-    void __imsmooth(const cv::Mat &img, const int radius); 
-    void __imsmooth(const cv::Mat &src, const cv::Mat &dst, const int radius); 
+    cv::Mat __imresize(const cv::Mat &src, const cv::Size &sizeDst);
+    cv::Mat __imsmooth(const cv::Mat &img, const int rad); 
     // image smoothing, authors used triangle convolution
 
-    void __getFeatures(const cv::Mat &img, std::vector <cv::Mat> &regularFeatures, 
-                       std::vector <cv::Mat> &additionalFeatures);
+    void __getFeatures(const cv::Mat &img, Mat3D &regularFeatures, 
+                       Mat3D &additionalFeatures);
     // extracting features for __classifier from img
 
     //----------------------------------------------------------
@@ -57,22 +53,7 @@ public:
     int __edge_orientations__; // number of edge orientation bins for output
 
     //----------------------------------------------------------
-
-    StructuredEdgeDetection(); 
     
-    StructuredEdgeDetection(const std::string filename); 
-    // load options and __classifier from filename 
-    
-    ~StructuredEdgeDetection();
-    
-    void save(const std::string filename); 
-    // serialize options and __classifier into filename
-    
-    void load(const std::string filename); 
-    // load options and __classifier from filename
-
-    void train(); // ...
-
     void detectSingleScale(cv::InputArray src,   
                            cv::OutputArrayOfArrays dst);     
     // detect edges in src, dst  is vector of matrices 
@@ -81,6 +62,20 @@ public:
     void detectMultipleScales(cv::InputArray src,   
                               cv::OutputArrayOfArrays dst);  
     // detect edges in {0.5, 1, and 2}-times scaled source image, then average
+
+    void train(); // ...
+
+    void save(const std::string &filename); 
+    // serialize options and __classifier into filename
+
+    void load(const std::string &filename); 
+    // load options and __classifier from filename
+
+    StructuredEdgeDetection(); 
+    StructuredEdgeDetection(const std::string &filename); 
+    // load options and __classifier from filename 
+
+    virtual ~StructuredEdgeDetection() {};
 };
 
 #endif

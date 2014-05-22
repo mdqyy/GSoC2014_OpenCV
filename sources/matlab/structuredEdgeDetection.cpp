@@ -18,27 +18,23 @@
 
 #define INPUT_ARGS(N, M) \
 	if (nrhs < (N)) { \
-		mexErrMsgIdAndTxt("structuredEdgeDetection: wrong_call", \
-                          "INPUT_ARGS(_N_, M)"); \
+		mexErrMsgTxt("INPUT_ARGS(_N_, M)"); \
 		return; \
 	} \
     \
 	if (nrhs > (M)) { \
-		mexErrMsgIdAndTxt("structuredEdgeDetection: wrong_call", \
-                          "INPUT_ARGS(N, _M_)"); \
+		mexErrMsgTxt("INPUT_ARGS(N, _M_)"); \
 		return; \
 	}
 
 #define OUTPUT_ARGS(N, M) \
 	if (nlhs < (N)) { \
-		mexErrMsgIdAndTxt("structuredEdgeDetection: wrong_call", \
-                          "OUTPUT_ARGS(_N_, M)"); \
+		mexErrMsgTxt("OUTPUT_ARGS(_N_, M)"); \
 		return; \
 	} \
     \
 	if (nlhs > (M)) { \
-		mexErrMsgIdAndTxt("structuredEdgeDetection: wrong_call", \
-                          "OUTPUT_ARGS(N, _M_)"); \
+		mexErrMsgTxt("OUTPUT_ARGS(N, _M_)"); \
 		return; \
 	}
 
@@ -85,8 +81,7 @@
 //                 int nrhs, const mxArray *prhs[])
 //{
 //    if (nrhs == 0) {
-//        mexErrMsgIdAndTxt("structuredEdgeDetection: wrong_call", 
-//                          "nrhs == 0");
+//        mexErrMsgTxt("nrhs == 0");
 //        return;
 //    }
 //    COMMAND cmd = (COMMAND)(int) *( (double *) mxGetPr(prhs[0]) );
@@ -105,14 +100,33 @@
 //            break;
 //        
 //        default:
-//            mexErrMsgIdAndTxt("structuredEdgeDetection: wrong_call", 
-//                              "switch (cmd): default");
+//            mexErrMsgTxt("switch (cmd): default");
 //            break;
 //    }
 //}
 
 MEXFUNCTION_LINKAGE void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+    if (nlhs != 1) mexErrMsgTxt("nlhs != 1");      
+    if (nrhs != 1) mexErrMsgTxt("nrhs != 1");
+
+    if (mxIsComplex(prhs[0]) || mxIsSparse(prhs[0]) || !mxIsClass(prhs[0], "double"))
+        mexErrMsgTxt("mxIsComplex(prhs[0]) || mxIsSparse(prhs[0]) || !mxIsClass(prhs[0], \"double\")");
+
+    const size_t sizeOfSizes = mxGetNumberOfDimensions(prhs[0]);
+    const mwSize *sizes = mxGetDimensions(prhs[0]);
+
+    if (sizeOfSizes < 2 || sizeOfSizes > 3 || (sizeOfSizes == 3 && sizes[2] != 3))
+        mexErrMsgTxt("sizeOfSizes < 2 || sizeOfSizes > 3 || (sizeOfSizes == 3 && sizes[2] != 3)");
+
+    cv::Mat src = MxArray(prhs[0]).toMat(); 
+    src.convertTo(src, cv::DataType<float>::type);
+
     StructuredEdgeDetection img2edges;
-    img2edges.__convertFromMatlab("model.matlab.xml", "model.opencv.xml");
+
+    cv::Mat edges;
+    img2edges.detectSingleScale(src, edges);
+
+    edges.convertTo(edges, cv::DataType<double>::type);
+    plhs[0] = MxArray(edges);
 }

@@ -1,210 +1,189 @@
 #include "structuredEdgeDetection.h"
 
-void StructuredEdgeDetection::__imresize(const cv::Mat &src, cv::Mat &dst,
-                                         const cv::Size dstSize)
+cv::Mat StructuredEdgeDetection::__imresize
+    (const cv::Mat &src, const cv::Size &sizeDst)
 {
-    if ( dstSize != src.size() ) {
-        int resizeType = dstSize.height < src.size().height ? cv::INTER_AREA : cv::INTER_LINEAR;
-        cv::resize(src, dst, dstSize, 0.0f, 0.0f, resizeType);
-    }
+    int resizeType = sizeDst.height <= src.size().height 
+                   ? cv::INTER_AREA 
+                   : cv::INTER_LINEAR;
+
+    cv::Mat dst; 
+    if ( sizeDst != src.size() ) 
+        cv::resize(src, dst, sizeDst, 0.0f, 0.0f, resizeType);
     else
-        dst = src; // no data copying
+        dst = src;
+
+    return dst;
 }
 
-void StructuredEdgeDetection::__imresize(const cv::Mat &src, cv::Mat &dst,
-                                         const float resizeFactor)
+cv::Mat StructuredEdgeDetection::__imsmooth
+    (const cv::Mat &src, const int rad)
 {
-    if (std::abs(resizeFactor - 1.0f) > 1e-2) {
-        int resizeType = resizeFactor < 1.0f ? cv::INTER_AREA : cv::INTER_LINEAR;
-        cv::resize(src, dst, cv::Size(0.0, 0.0), resizeFactor, resizeFactor, resizeType);
-    }
-    else
-        dst = src; // no data copying
+    if (rad < 1) 
+        return src;
+
+    cv::Mat dst;
+
+    cv::Size sizeFltr(rad + !(rad&1), rad + !(rad&1));
+    cv::boxFilter(src, dst, -1, sizeFltr, cv::Point(-1,-1), true, cv::BORDER_REFLECT);
+    cv::boxFilter(dst, dst, -1, sizeFltr, cv::Point(-1,-1), true, cv::BORDER_REFLECT);
+
+    return dst; 
 }
 
-void StructuredEdgeDetection::__imresize(const cv::Mat &img, 
-                                         const cv::Size dstSize)
-{
-    if ( dstSize != img.size() ) {
-        int resizeType = dstSize.height < src.size().height ? cv::INTER_AREA : cv::INTER_LINEAR;
-        cv::resize(img, img, dstSize, 0.0f, 0.0f, resizeType);
-    }
-}
-void StructuredEdgeDetection::__imresize(const cv::Mat &img, 
-                                         const float resizeFactor)
-{
-    if (std::abs(resizeFactor - 1.0f) > 1e-2) {
-        int resizeType = resizeFactor < 1.0f ? cv::INTER_AREA : cv::INTER_LINEAR;
-        cv::resize(img, img, cv::Size(0.0, 0.0), resizeFactor, resizeFactor, resizeType);
-    }
-}
-
-void StructuredEdgeDetection::__imsmooth(const cv::Mat &src, 
-                                         const cv::Mat &dst,
-                                         const int radius)
-{
-    if (radius < 1) 
-        return;
-
-    cv::Size fSize(radius+!(radius&1), radius+!(radius&1));
-    cv::boxFilter(src, dst, -1, fSize, cv::Point(-1,-1), true, cv::BORDER_REFLECT);
-    cv::boxFilter(dst, dst, -1, fSize, cv::Point(-1,-1), true, cv::BORDER_REFLECT);
-}
-
-void StructuredEdgeDetection::__imsmooth(const cv::Mat &img,
-                                         const int radius)
-{
-    if (radius < 1) 
-        return;
-
-    cv::Size fSize(radius+!(radius&1), radius+!(radius&1));
-    cv::boxFilter(src, dst, -1, fSize, cv::Point(-1,-1), true, cv::BORDER_REFLECT);
-    cv::boxFilter(dst, dst, -1, fSize, cv::Point(-1,-1), true, cv::BORDER_REFLECT);
-}
-
-void StructuredEdgeDetection::__getFeatures(const cv::Mat &img, 
-                         std::vector<cv::Mat> &regularFeatures, 
-                         std::vector<cv::Mat> &additionalFeatures)
+void StructuredEdgeDetection::__getFeatures
+    (const cv::Mat &img, Mat3D &regularFeatures, Mat3D &additionalFeatures)
 {
     cv::Mat luvImg;
     cv::cvtColor(img, luvImg, CV_RGB2Luv);
 
-    cv::Mat shrinked;
-    __imresize(luvImg, shrinked, 1/__shrink_number__);
-    cv::split(shrinked, regularFeatures);
+    std::vector <cv::Mat> features;
 
-    std::vector <float> scales = {1.0, 0.5};
-    for (size_t i = 0; i < scales.size(); ++i) {
+    cv::Size sizeSc(img.cols/__shrink_number__, img.rows/__shrink_number__);
+    cv::Mat shrinked = __imresize(luvImg, sizeSc);
+    cv::split(shrinked, features);
 
-        cv::Mat I;
-        if (abs(__shrink_number__ - scales[i]) < 1e-2)
-            I = shrinked; // no data copying
-        else
-            __imresize(luvImg, I, scales[i]);
+    float scalesData[] = {1.0, 0.5};
+    std::vector <float> scales(std::begin(scalesData), std::end(scalesData));
+    
+    for (size_t k = 0; k < scales.size(); ++k) 
+    {
+        cv::Size sizeSc( int(scales[k]*img.cols), int(scales[k]*img.rows) );
+        cv::Mat I = abs(__shrink_number__ - scales[k]) < 1e-2 
+                  ? shrinked 
+                  : __imresize(luvImg, sizeSc);
 
-        cv::Mat Dx, Dy, magnitude, angle;
+        cv::Mat Dx, Dy, magnitude, phase;
         cv::Sobel(I, Dx, cv::DataType<float>::type, 1, 0, 1, 
-            1.0, 0.0, cv::BORDER_REFLECT);
+                  1.0, 0.0, cv::BORDER_REFLECT);
         cv::Sobel(I, Dy, cv::DataType<float>::type, 1, 0, 1, 
-            1.0, 0.0, cv::BORDER_REFLECT);
+                  1.0, 0.0, cv::BORDER_REFLECT);
 
-        cv::reduce(Dx.reshape(1, 3), Dx, 1, CV_REDUCE_MAX, -1);
-        Dx.reshape(1, I.rows);
+        cv::reduce(Dx.reshape(1, I.rows*I.cols), Dx, 1, CV_REDUCE_MAX, -1);
+        cv::reduce(Dy.reshape(1, I.rows*I.cols), Dy, 1, CV_REDUCE_MAX, -1);
 
-        cv::reduce(Dy.reshape(1, 3), Dy, 1, CV_REDUCE_MAX, -1);
-        Dy.reshape(1, I.rows);
+        Dx = Dx.reshape(1, I.rows);
+        Dy = Dy.reshape(1, I.rows);
 
-        cv::phase(Dx, Dy, angle);
+        cv::phase(Dx, Dy, phase);
         cv::magnitude(Dx, Dy, magnitude);
 
-        cv::Mat smoothed;
-        __imsmooth(magnitude, smoothed, __gradient_normalization__);
+        cv::Mat smoothed = __imsmooth(magnitude, __gradient_normalization__);
         magnitude /= smoothed + 0.1;
 
-        std::vector <cv::Mat> hist(__gradient_orientations__, cv::Mat(...));
-        for (int i = 0; i < __gradient_orientations__; ++i)
-            ...
+        int binSize = std::max(1, int(__shrink_number__/scales[k]) );
 
-        __imresize( magnitude, src.size() );
-        regularFeatures.push_back(magnitude);
-        for (size_t j = 0; j < hist.size(); ++j)
-            __imresize( hist[j], src.size() );
-        std::copy(hist.begin(), hist.end(), std::back_inserter(regularFeatures));
+        int histHeight = int( std::floor(I.rows / binSize) );
+        int histWidth  = int( std::floor(I.cols / binSize) );
+
+        int histType = CV_MAKETYPE(cv::DataType<float>::type, __gradient_orientations__);
+        cv::Mat hist( histHeight, histWidth, histType, cv::Scalar::all(0) );
+
+        for (size_t i = 0; i < phase.rows; ++i)
+        {
+            float *anglePtr  = phase.ptr<float>(i);
+            float *lengthPtr = magnitude.ptr<float>(i);
+
+            for (size_t j = 0; j < phase.cols; ++j)
+            {
+                float angle = anglePtr[j] * __gradient_orientations__;
+                float *data = (float *) hist.data;
+                        
+                int index = int( (i/binSize)*histHeight 
+                          + (j/binSize)*__gradient_orientations__ 
+                          + std::floor(angle / (2*CV_PI)) );
+                data[index] += lengthPtr[j];
+            }
+        }
+
+        magnitude = __imresize( magnitude, img.size() );
+        features.push_back(magnitude);
+        features.push_back(/**/ __imresize( hist, img.size() ) /**/);
     }
 
-    for (size_t i = 0; i < regularFeatures.size(); ++i) {
+    // Mixing and smoothing
 
-        additionalFeatures.push_back(regularFeatures[i]);
-        __imsmooth( additionalFeatures[i], additionalFeatures[i],
-            cvRound(__nonreg_features_smoothing__ 
-                    / float(__shrink_number__)) );
+    int resType = CV_MAKETYPE(cv::DataType<float>::type, __edge_orientations__);
+    regularFeatures.create(img.size(), resType);
+    additionalFeatures.create(img.size(), resType);
 
-        __imsmooth( regularFeatures[i], regularFeatures[i], 
-            cvRound(__reg_features_smoothing__
-                    / float(__shrink_number__)) );
-    }
+    std::vector <int> fromTo(2*__edge_orientations__, 0);
+    for (int i = 0; i < 2*__edge_orientations__; ++i)
+        fromTo.push_back(i/2);
+    cv::mixChannels(features, regularFeatures, fromTo);
+
+    int rad1 = cvRound(__nonreg_features_smoothing__ / float(__shrink_number__));
+    additionalFeatures = __imsmooth(regularFeatures, rad1);
+
+    int rad2 = cvRound(__reg_features_smoothing__ / float(__shrink_number__));
+    regularFeatures = __imsmooth(regularFeatures, rad2);
 }
 
-void StructuredEdgeDetection::detectSingleScale(cv::InputArray _src,
-                                                cv::OutputArrayOfArrays _dst)
+void StructuredEdgeDetection::detectSingleScale
+    (cv::InputArray _src, cv::OutputArrayOfArrays _dst)
 {
-    cv::Mat src = _src.getMat().clone(); 
-    CV_Assert( src.type() == cv::DataType<float>::type
-           &&  src.channels() == 3);
+    cv::Mat src = _src.getMat();
+    CV_Assert( src.type() == CV_MAKETYPE(cv::DataType<float>::type, 3) );
 
     // Extraction
-    std::vector <cv::Mat> regularFeatures;
-    std::vector <cv::Mat> additionalFeatures;
-    __getFeatures(src, regularFeatures, 
-                  additionalFeatures);
+    Mat3D regularFeatures, additionalFeatures;
+    __getFeatures(src, regularFeatures, additionalFeatures);
 
     // Detection
-    ...
+    //...
 
     // Ending
-    std::vector <cv::Mat> dst = _dst.getMat();
-    dst.resize(__edge_orientations__);
-    for (size_t i = 0; i < result.size(); ++i)
-        result[i].copyTo(dst[i]);
+    //result.copyTo(_dst.getMat());
 }
 
-void StructuredEdgeDetection::detectMultipleScales(cv::InputArray _src,
-                                                   cv::OutputArrayOfArrays _dst)
+void StructuredEdgeDetection::detectMultipleScales
+    (cv::InputArray _src, cv::OutputArrayOfArrays _dst)
 {
     cv::Mat src = _src.getMat(); 
-    CV_Assert( src.type() == cv::DataType<float>::type
-           &&  src.channels() == 3);
-
-    std::vector <float> scales = {0.5f, 1.0f, 2.0f};
+    CV_Assert( src.type() == CV_MAKETYPE(cv::DataType<float>::type, 3));
     
-    cv::vector <cv::Mat> result(__edge_orientations__, 
-        cv::Mat( src.rows, src.cols, src.type(), cv::Scalar::all(0) ));
+    int resType = CV_MAKETYPE(cv::DataType<float>::type, __edge_orientations__);
+    Mat3D result( src.size(), resType, cv::Scalar::all(0) );
 
-    for (size_t i = 0; i < scales.size(); ++i) {
-        
-        cv::Mat scaled;
-        __imresize(src, scaled, scales[i]);
+    float scalesData[] = {0.5f, 1.0f, 2.0f};
+    std::vector <float> scales(std::begin(scalesData), std::end(scalesData));
+
+    for (size_t i = 0; i < scales.size(); ++i) 
+    {        
+        cv::Size sizeSc( int(scales[i]*src.cols), int(scales[i]*src.rows) );
+        cv::Mat scaledSrc = __imresize(src, sizeSc);
        
-        std::vector <cv::Mat> currentResult(__edge_orientations__, 
-            cv::Mat( src.rows, src.cols, src.type(), cv::Scalar::all(0) ));
-        detectSingleScale(scaled, currentResult);
+        Mat3D scaledResult( scaledSrc.size(), resType, cv::Scalar::all(0) );
+        detectSingleScale(scaledSrc, scaledResult);
         
-        for (size_t j = 0; j < currentResult.size(); ++j) {
-            __imresize( currentResult[j], result[j].size() );
-            result[j] += currentResult[j];
-        }
+        result += __imresize( scaledResult, result.size() );
     }
+    result /= float( scales.size() );
 
-    for (size_t i = 0; i < result.size(); ++i)
-        result[i] /= scales.size();
-
-    std::vector <cv::Mat> dst = _dst.getMat();
-    dst.resize(__edge_orientations__);
-    
-    for (size_t i = 0; i < result.size(); ++i)
-        result[i].copyTo(dst[i]);
+    result.copyTo(_dst.getMat());
 }
 
-void StructuredEdgeDetection::train()
-{
-    //__classifier.train(...);
+void StructuredEdgeDetection::train() {}
+
+void StructuredEdgeDetection::load(const std::string &filename) {}
+
+void StructuredEdgeDetection::save(const std::string &filename) {}
+
+StructuredEdgeDetection::StructuredEdgeDetection()
+{  
+    __non_maximum_supression__ = false; 
+    __stride_width__ = 2;            
+    __shrink_number__ = 2;           
+    __patch_width__ = 32;             
+    __gradient_orientations__ = 4;   
+    __gradient_smoothing__ = 0;      
+    __reg_features_smoothing__ = 2;  
+    __nonreg_features_smoothing__ = 8;   
+    __gradient_normalization__ = 4; 
+    __selfsimilarity_cells__ = 5;   
+    __number_of_trees__ = 8;             
+    __number_of_trees_to_evaluate__ = 4; 
+    __edge_orientations__ = 13;           
 }
 
-void StructuredEdgeDetection::load(std::string filename) 
-{
-    __classifier.load( filename.c_str() );
-}
-
-void StructuredEdgeDetection::save(std::string filename) 
-{
-    __classifier.save( filename.c_str() );    
-}
-
-StructuredEdgeDetection::StructuredEdgeDetection(){}
-
-StructuredEdgeDetection::StructuredEdgeDetection(const std::string filename)
-{
-    __classifier.load( filename.c_str() );
-}
-
-StructuredEdgeDetection::~StructuredEdgeDetection(){}
+StructuredEdgeDetection::StructuredEdgeDetection(const std::string &filename){}
