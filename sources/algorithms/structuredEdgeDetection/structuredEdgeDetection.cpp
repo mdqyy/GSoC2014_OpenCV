@@ -141,47 +141,75 @@ void StructuredEdgeDetection::__detectEdges
     int shrink = __rf.options.shrinkNumber;
     int stride = __rf.options.stride;
     int pSize  = __rf.options.patchSize;
+    int gridSize = __rf.options.selfsimilarityGridSize;
 
     const int height = (int) std::ceil( double(features.rows*shrink - pSize) / stride ); 
     const int width  = (int) std::ceil( double(features.cols*shrink - pSize) / stride ); 
+    const int channels = features.channels();
     // image size in patches
 
     int indType = CV_MAKETYPE(cv::DataType<unsigned int>::type, nTreesEval);
     NChannelsMat indexes(height, width, indType);
 
-    for (int i = 0, k = 0; i < height; ++k, i += (k %= nTreesEval))
-        // cycle over rows and trees
-            for (int j = 0, num = 0; j < width;)
-            {
-                int offset = (i*stride/shrink)*features.rows/shrink
-                           + (num*stride/shrink);
+    std::vector <int> offsetI(pSize/shrink)*(pSize/shrink)*channels, 0); 
+    for (int i = 0; i < CV_SQR(pSize/shrink)*channels; ++i)
+    {
+        int x = i/channels%(pSize/shrink);
+        int y = i/channels/(pSize/shrink);
+        
+        offsetI[i] = y*(features.cols/shrink)*channels + x*channels + (i%channels);
+    }
+    // lookup table for mapping linear index to offsets
 
-                int currentNode = ( ((i + j)%(2*nTreesEval) + k)%nTrees )*nTreesNodes;
-                // select root node of the tree to evaluate
+    int *offsetX = new int[CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels]; 
+    int *offsetY = new int[CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels]; 
+    for (int i = 0, n = 0; i < CV_SQR(gridSize)*channels; ++i)
+        for (int j = (i + 1)/channels; j < CV_SQR(gridSize); ++j, ++n)
+        {
+            int x1 = i/channels%gridSize, y1 = i/channels/gridSize;
+            int x2 = j%gridSize, y2 = j/gridSize;
 
-                while (__rf.childs[currentNode] != -1)
-                {
-                    unsigned int currentId = __rf.featureIds[currentNode];
-                    float currentFeature = (currentId < nFeatures)
-                                         ? regFeatures.data[offset + __rf.regId2xy[currentId]]
-                                         : ssFeatures.data[offset + __rf.ssId2xy1[currentId - nFeatures]]
-                                           - ssFeatures.data[offset + __rf.ssId2xy2[currentId - nFeatures]];
-                     
-                    // compare feature to threshold and move left or right accordingly
-                    if (currentFeature < __rf.thresholds[currentNode])
-                        currentNode = __rf.childs[currentNode] - 1;
-                    else
-                        currentNode = __rf.childs[currentNode];
-                }
+            ...offsetX[n] = y1*(features.cols/shrink)*channels + x1*channels + (i%channels);
+            ...offsetY[n] = y2*(features.cols/shrink)*channels + x2*channels + (i%channels);
+        }
+    // lookup tables for mapping linear index to offset pairs
 
-                indexes.data[k*height*width + i*height +j] = currentNode;
+    for (int i = 0; i < height; ++i)
+    {
+       float *regFeaturesPtr = regFeatures.ptr<float>(i*stride/shrink);
+       float  *ssFeaturesPtr = ssFeatures.ptr<float>(i*stride/shrink);
 
-                // column for(...) increment
-                if ((j += 2) >= width && num == 0) 
-                    j = ++num;
-            }
+       for (int j = 0, k = 0; j < width; ++k, j += !(k %= nTreesEval))
+       // for j,k in [0;width)x[0;nTreesEval)
+       {
+           int currentNode = ( ((i + j)%(2*nTreesEval) + k)%nTrees )*nTreesNodes;
+           // select root node of the tree to evaluate
 
+           int offset = j*stride/shrink;
+           while (__rf.childs[currentNode] != -1)
+           {
+               unsigned int currentId = __rf.featureIds[currentNode];
+               float currentFeature = (currentId < nFeatures)
+                                    ? regFeaturesPtr[offset + offsetI[currentId]]
+                                    :   ssFeaturesPtr[offset + offsetX[currentId - nFeatures]]
+                                      - ssFeaturesPtr[offset + offsetY[currentId - nFeatures]];
+                
+               // compare feature to threshold and move left or right accordingly
+               if (currentFeature < __rf.thresholds[currentNode])
+                   currentNode = __rf.childs[currentNode] - 1;
+               else
+                   currentNode = __rf.childs[currentNode];
+           }
 
+           indexes.data[i*height*channels + j*channels + k] = currentNode;
+       }
+    }
+
+    delete [] offsetI;
+    delete [] offsetX;
+    delete [] offsetY;
+
+    ...
 }
 
 void StructuredEdgeDetection::detectSingleScale
@@ -243,6 +271,8 @@ StructuredEdgeDetection::StructuredEdgeDetection()
                    __rf.options.numberOfTrees = 8;             
          __rf.options.numberOfTreesToEvaluate = 4; 
           __rf.options.numberOfOutputChannels = 13;           
+
+    
 }
 
 StructuredEdgeDetection::StructuredEdgeDetection(const std::string &filename){}

@@ -11,6 +11,11 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/ml/ml.hpp>
 
+#ifndef CV_SQR
+#  define CV_SQR(x)  ((x)*(x)) 
+#endif
+
+
 typedef cv::Mat NChannelsMat;
 
 struct RandomForestOptions
@@ -61,10 +66,6 @@ struct RandomForest
     std::vector <unsigned int> thresholds;
     std::vector <unsigned int> childs;
 
-    std::vector <unsigned int> regId2xy;
-    std::vector <unsigned int> ssId2xy1;
-    std::vector <unsigned int> ssId2xy2;
-    
     ...
 };
 
