@@ -367,7 +367,7 @@ class MxArray
     inline cv::Rect toRect() const { return toRect_<int>(); }
     /** Alias to toScalar_<double>
      */
-    inline cv::Scalar toScalar() const { return toScalar_<double>(); }   
+    inline cv::Scalar toScalar() const { return toScalar_<double>(); }
 
     /** Class ID of mxArray.
      */

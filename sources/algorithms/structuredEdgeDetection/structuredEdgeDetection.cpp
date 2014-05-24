@@ -3,12 +3,12 @@
 cv::Mat StructuredEdgeDetection::__imresize
     (const cv::Mat &src, const cv::Size &sizeDst)
 {
-    int resizeType = sizeDst.height <= src.size().height 
-                   ? cv::INTER_AREA 
+    int resizeType = sizeDst.height <= src.size().height
+                   ? cv::INTER_AREA
                    : cv::INTER_LINEAR;
 
-    cv::Mat dst; 
-    if ( sizeDst != src.size() ) 
+    cv::Mat dst;
+    if ( sizeDst != src.size() )
         cv::resize(src, dst, sizeDst, 0.0f, 0.0f, resizeType);
     else
         dst = src;
@@ -19,7 +19,7 @@ cv::Mat StructuredEdgeDetection::__imresize
 cv::Mat StructuredEdgeDetection::__imsmooth
     (const cv::Mat &src, const int rad)
 {
-    if (rad < 1) 
+    if (rad < 1)
         return src;
 
     cv::Mat dst;
@@ -29,18 +29,18 @@ cv::Mat StructuredEdgeDetection::__imsmooth
     cv::boxFilter(dst, dst, -1, cv::Size(2*rad/3, 2*rad/3),
         cv::Point(-1,-1), true, cv::BORDER_REFLECT);
 
-    return dst; 
+    return dst;
 }
 
 void StructuredEdgeDetection::__imhog
-    (const cv::Mat &img, cv::Mat &magnitude, cv::Mat &histogram, 
+    (const cv::Mat &img, cv::Mat &magnitude, cv::Mat &histogram,
      const int numberOfBins, const int sizeOfPatch, const int gradientNormalizationRadius)
 {
     cv::Mat Dx, Dy, phase;
 
-    cv::Sobel(img, Dx, cv::DataType<float>::type, 
+    cv::Sobel(img, Dx, cv::DataType<float>::type,
               1, 0, 1, 1.0, 0.0, cv::BORDER_REFLECT);
-    cv::Sobel(img, Dy, cv::DataType<float>::type, 
+    cv::Sobel(img, Dy, cv::DataType<float>::type,
               1, 0, 1, 1.0, 0.0, cv::BORDER_REFLECT);
 
     cv::reduce(Dx.reshape(1, img.rows*img.cols), Dx, 1, CV_REDUCE_MAX, -1);
@@ -52,8 +52,8 @@ void StructuredEdgeDetection::__imhog
     cv::Mat smoothed = __imsmooth(magnitude, gradientNormalizationRadius);
     magnitude /= smoothed + 0.1;
 
-    int histHeight = int( std::floor(img.rows / sizeOfPatch) );
-    int histWidth  = int( std::floor(img.cols / sizeOfPatch) );
+    int histHeight = cvFloor(img.rows / sizeOfPatch);
+    int histWidth  = cvFloor(img.cols / sizeOfPatch);
 
     int histType = CV_MAKETYPE(cv::DataType<float>::type, numberOfBins);
     histogram.create( histHeight, histWidth, histType );
@@ -69,8 +69,8 @@ void StructuredEdgeDetection::__imhog
         {
             float angle = anglePtr[j] * numberOfBins;
             float *data = (float *) histogram.data;
-
-            int binIndex = std::floor(angle / (2*CV_PI));
+            
+            int binIndex = cvFloor(angle / (2*CV_PI));
             int index = int( ((j/sizeOfPatch) + binIndex)*numberOfBins );
             histPtr[index] += lengthPtr[j];
         }
@@ -96,16 +96,16 @@ void StructuredEdgeDetection::__getFeatures
 
     float scalesData[] = {1.0, 0.5};
     std::vector <float> scales(std::begin(scalesData), std::end(scalesData));
-    
-    for (size_t k = 0; k < scales.size(); ++k) 
+
+    for (size_t k = 0; k < scales.size(); ++k)
     {
         cv::Size sizeSc( int(scales[k]*img.cols), int(scales[k]*img.rows) );
-        cv::Mat I = abs(shrink - scales[k]) < 1e-2 
-                  ? shrinked 
+        cv::Mat I = abs(shrink - scales[k]) < 1e-2
+                  ? shrinked
                   : __imresize(luvImg, sizeSc);
 
         int sizeOfPatch = std::max( 1, int(shrink/scales[k]) );
-        
+
         cv::Mat magnitude, histogram;
         __imhog(I, magnitude, histogram, gradNum, sizeOfPatch, gnormRad);
 
@@ -142,7 +142,7 @@ void StructuredEdgeDetection::__detectEdges
     int nTrees = __rf.options.numberOfTrees;
     int nTreesNodes = __rf.numberOfTreeNodes;
 
-    unsigned int nFeatures = features.total()*unsigned int( features.channels() );
+    unsigned int nFeatures = unsigned int( features.total()*features.channels() );
     int outNum = __rf.options.numberOfOutputChannels;
 
     int stride = __rf.options.stride;
@@ -150,30 +150,30 @@ void StructuredEdgeDetection::__detectEdges
     int ipSize = __rf.options.patchInnerSize;
     int gridSize = __rf.options.selfsimilarityGridSize;
 
-    const int height = (int) std::ceil( double(features.rows*shrink - pSize) / stride ); 
-    const int width  = (int) std::ceil( double(features.cols*shrink - pSize) / stride ); 
+    const int height = cvCeil( double(features.rows*shrink - pSize) / stride );
+    const int width  = cvCeil( double(features.cols*shrink - pSize) / stride );
     const int channels = features.channels();
     // image size in patches
 
     int indType = CV_MAKETYPE(cv::DataType<unsigned int>::type, nTreesEval);
     NChannelsMat indexes(height, width, indType);
 
-    std::vector <int> offsetI((pSize/shrink)*(pSize/shrink)*channels, 0); 
+    std::vector <int> offsetI((pSize/shrink)*(pSize/shrink)*channels, 0);
     for (int i = 0; i < CV_SQR(pSize/shrink)*channels; ++i)
     {
         int x = i/channels%(pSize/shrink);
         int y = i/channels/(pSize/shrink);
-        
+
         offsetI[i] = y*(features.cols/shrink)*channels + x*channels + (i%channels);
     }
     // lookup table for mapping linear index to offsets
 
-    std::vector <int> offsetX( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0); 
-    std::vector <int> offsetY( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0); 
+    std::vector <int> offsetX( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0);
+    std::vector <int> offsetY( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0);
     for (int i = 0, n = 0; i < CV_SQR(gridSize)*channels; ++i)
         for (int j = (i + 1)/channels; j < CV_SQR(gridSize); ++j, ++n)
         {
-            float hc  = (pSize/shrink) / (2.0f*gridSize); 
+            float hc  = (pSize/shrink) / (2.0f*gridSize);
             // half of cell
 
             int x1 = cvRound(/**/ 2*( (i/channels%gridSize) + 0.5 )*hc /**/);
@@ -183,7 +183,7 @@ void StructuredEdgeDetection::__detectEdges
             int x2 = cvRound(/**/ 2*( (j%gridSize) + 0.5 )*hc /**/);
             int y2 = cvRound(/**/ 2*( (j/gridSize) + 0.5 )*hc /**/);
             // "+ 0.5" means cell center
-         
+
             offsetX[n] = y1*(features.cols/shrink)*channels + x1*channels + (i%channels);
             offsetY[n] = y2*(features.cols/shrink)*channels + x2*channels + (i%channels);
         }
@@ -208,7 +208,7 @@ void StructuredEdgeDetection::__detectEdges
                                     ? regFeaturesPtr[offset + offsetI[currentId]]
                                     :   ssFeaturesPtr[offset + offsetX[currentId - nFeatures]]
                                       - ssFeaturesPtr[offset + offsetY[currentId - nFeatures]];
-                
+
                // compare feature to threshold and move left or right accordingly
                if (currentFeature < __rf.thresholds[currentNode])
                    currentNode = __rf.childs[currentNode] - 1;
@@ -221,8 +221,10 @@ void StructuredEdgeDetection::__detectEdges
     }
 
     int dstType = CV_MAKETYPE(cv::DataType<float>::type, outNum);
-    dst.create(..., dstType);
-    
+    dst.create(features.size(), dstType);
+
+    float scale = 2.0 * CV_SQR(stride) / CV_SQR(ipSize) / nTreesEval;
+
     for (int i = 0; i < height; ++i)
     {
         unsigned int *indexPtr = indexes.ptr<unsigned int>(i);
@@ -250,23 +252,23 @@ void StructuredEdgeDetection::detectSingleScale
 void StructuredEdgeDetection::detectMultipleScales
     (cv::InputArray _src, cv::OutputArray _dst)
 {
-    cv::Mat src = _src.getMat(); 
+    cv::Mat src = _src.getMat();
     CV_Assert( src.type() == CV_MAKETYPE(cv::DataType<float>::type, 3));
-    
+
     int resType = CV_MAKETYPE(cv::DataType<float>::type, __rf.options.numberOfOutputChannels);
     NChannelsMat result( src.size(), resType, cv::Scalar::all(0) );
 
     float scalesData[] = {0.5f, 1.0f, 2.0f};
     std::vector <float> scales(std::begin(scalesData), std::end(scalesData));
 
-    for (size_t i = 0; i < scales.size(); ++i) 
-    {        
+    for (size_t i = 0; i < scales.size(); ++i)
+    {
         cv::Size sizeSc( int(scales[i]*src.cols), int(scales[i]*src.rows) );
         cv::Mat scaledSrc = __imresize(src, sizeSc);
-       
+
         NChannelsMat scaledResult( scaledSrc.size(), resType, cv::Scalar::all(0) );
         detectSingleScale(scaledSrc, scaledResult);
-        
+
         result += __imresize( scaledResult, result.size() );
     }
     result /= float( scales.size() );
@@ -281,22 +283,20 @@ void StructuredEdgeDetection::load(const std::string &filename) {}
 void StructuredEdgeDetection::save(const std::string &filename) {}
 
 StructuredEdgeDetection::StructuredEdgeDetection()
-{  
-                          __rf.options.stride = 2;            
-                    __rf.options.shrinkNumber = 2;           
-                       __rf.options.patchSize = 32;             
-                  __rf.options.patchInnerSize = 16;             
-    __rf.options.numberOfGradientOrientations = 4;   
-         __rf.options.gradientSmoothingRadius = 0;      
-       __rf.options.regFeatureSmoothingRadius = 2;  
-        __rf.options.ssFeatureSmoothingRadius = 8;   
-     __rf.options.gradientNormalizationRadius = 4; 
-          __rf.options.selfsimilarityGridSize = 5;   
-                   __rf.options.numberOfTrees = 8;             
-         __rf.options.numberOfTreesToEvaluate = 4; 
-          __rf.options.numberOfOutputChannels = 13;           
-
-    
+{
+                          __rf.options.stride = 2;
+                    __rf.options.shrinkNumber = 2;
+                       __rf.options.patchSize = 32;
+                  __rf.options.patchInnerSize = 16;
+    __rf.options.numberOfGradientOrientations = 4;
+         __rf.options.gradientSmoothingRadius = 0;
+       __rf.options.regFeatureSmoothingRadius = 2;
+        __rf.options.ssFeatureSmoothingRadius = 8;
+     __rf.options.gradientNormalizationRadius = 4;
+          __rf.options.selfsimilarityGridSize = 5;
+                   __rf.options.numberOfTrees = 8;
+         __rf.options.numberOfTreesToEvaluate = 4;
+          __rf.options.numberOfOutputChannels = 13;
 }
 
 StructuredEdgeDetection::StructuredEdgeDetection(const std::string &filename){}

@@ -369,7 +369,7 @@ cv::SparseMat MxArray::toSparseMat() const
 {
     // Check if it's sparse.
     if (!isSparse() || !isDouble())
-        mexErrMsgIdAndTxt("mexopencv:error", "MxArray is not sparse");        
+        mexErrMsgIdAndTxt("mexopencv:error", "MxArray is not sparse");
     mwIndex *ir = mxGetIr(p_);
     mwIndex *jc = mxGetJc(p_);
     if (ir == NULL || jc == NULL)

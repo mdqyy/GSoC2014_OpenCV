@@ -17,33 +17,33 @@
 
 
 #define INPUT_ARGS(N, M) \
-	if (nrhs < (N)) { \
-		mexErrMsgTxt("INPUT_ARGS(_N_, M)"); \
-		return; \
-	} \
+    if (nrhs < (N)) { \
+        mexErrMsgTxt("INPUT_ARGS(_N_, M)"); \
+        return; \
+    } \
     \
-	if (nrhs > (M)) { \
-		mexErrMsgTxt("INPUT_ARGS(N, _M_)"); \
-		return; \
-	}
+    if (nrhs > (M)) { \
+        mexErrMsgTxt("INPUT_ARGS(N, _M_)"); \
+        return; \
+    }
 
 #define OUTPUT_ARGS(N, M) \
-	if (nlhs < (N)) { \
-		mexErrMsgTxt("OUTPUT_ARGS(_N_, M)"); \
-		return; \
-	} \
+    if (nlhs < (N)) { \
+        mexErrMsgTxt("OUTPUT_ARGS(_N_, M)"); \
+        return; \
+    } \
     \
-	if (nlhs > (M)) { \
-		mexErrMsgTxt("OUTPUT_ARGS(N, _M_)"); \
-		return; \
-	}
+    if (nlhs > (M)) { \
+        mexErrMsgTxt("OUTPUT_ARGS(N, _M_)"); \
+        return; \
+    }
 
 
 //vector <structuredEdgeDetection *> objects;
 //int creations = 0;
 //int deletions = 0;
 //
-//enum COMMAND 
+//enum COMMAND
 //{
 //    CREATE   = 1,
 //    DELETE   = 2,
@@ -51,7 +51,7 @@
 //};
 //
 //void cmdCreate(int nlhs, mxArray *plhs[],
-//               int nrhs, const mxArray *prhs[]) 
+//               int nrhs, const mxArray *prhs[])
 //{
 //    INPUT_ARGS(3, 3)
 //    OUTPUT_ARGS(1, 1)
@@ -68,7 +68,7 @@
 //    deletions++;
 //}
 //
-//void cmdClear() 
+//void cmdClear()
 //{
 //    for(int i = 0; i < objects.size(); ++i)
 //        delete [] objects[i];
@@ -90,15 +90,15 @@
 //        case CREATE:
 //            cmdCreate(nlhs,plhs,nrhs,prhs);
 //            break;
-//        
+//
 //        case DELETE:
 //            cmdDelete(nrhs,prhs);
 //            break;
-//        
+//
 //        case CLEAR:
 //            cmdClear();
 //            break;
-//        
+//
 //        default:
 //            mexErrMsgTxt("switch (cmd): default");
 //            break;
@@ -107,7 +107,7 @@
 
 MEXFUNCTION_LINKAGE void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nlhs != 1) mexErrMsgTxt("nlhs != 1");      
+    if (nlhs != 1) mexErrMsgTxt("nlhs != 1");
     if (nrhs != 1) mexErrMsgTxt("nrhs != 1");
 
     if (mxIsComplex(prhs[0]) || mxIsSparse(prhs[0]) || !mxIsClass(prhs[0], "double"))
@@ -119,7 +119,7 @@ MEXFUNCTION_LINKAGE void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const 
     if (sizeOfSizes < 2 || sizeOfSizes > 3 || (sizeOfSizes == 3 && sizes[2] != 3))
         mexErrMsgTxt("sizeOfSizes < 2 || sizeOfSizes > 3 || (sizeOfSizes == 3 && sizes[2] != 3)");
 
-    cv::Mat src = MxArray(prhs[0]).toMat(); 
+    cv::Mat src = MxArray(prhs[0]).toMat();
     src.convertTo(src, cv::DataType<float>::type);
     cv::cvtColor(src, src, CV_BGR2RGB);
 
