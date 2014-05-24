@@ -151,7 +151,7 @@ void StructuredEdgeDetection::__detectEdges
     int indType = CV_MAKETYPE(cv::DataType<unsigned int>::type, nTreesEval);
     NChannelsMat indexes(height, width, indType);
 
-    std::vector <int> offsetI(pSize/shrink)*(pSize/shrink)*channels, 0); 
+    std::vector <int> offsetI((pSize/shrink)*(pSize/shrink)*channels, 0); 
     for (int i = 0; i < CV_SQR(pSize/shrink)*channels; ++i)
     {
         int x = i/channels%(pSize/shrink);
@@ -161,16 +161,24 @@ void StructuredEdgeDetection::__detectEdges
     }
     // lookup table for mapping linear index to offsets
 
-    int *offsetX = new int[CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels]; 
-    int *offsetY = new int[CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels]; 
+    std::vector <int> offsetX( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0); 
+    std::vector <int> offsetY( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0); 
     for (int i = 0, n = 0; i < CV_SQR(gridSize)*channels; ++i)
         for (int j = (i + 1)/channels; j < CV_SQR(gridSize); ++j, ++n)
         {
-            int x1 = i/channels%gridSize, y1 = i/channels/gridSize;
-            int x2 = j%gridSize, y2 = j/gridSize;
+            float hc  = (pSize/shrink) / (2.0*gridSize); 
+            // half of cell
 
-            ...offsetX[n] = y1*(features.cols/shrink)*channels + x1*channels + (i%channels);
-            ...offsetY[n] = y2*(features.cols/shrink)*channels + x2*channels + (i%channels);
+            int x1 = cvRound(/**/ 2*( (i/channels%gridSize) + 0.5 )*hc /**/);
+            int y1 = cvRound(/**/ 2*( (i/channels/gridSize) + 0.5 )*hc /**/);
+            // "+ 0.5" means cell center
+
+            int x2 = cvRound(/**/ 2*( (j%gridSize) + 0.5 )*hc /**/);
+            int y2 = cvRound(/**/ 2*( (j/gridSize) + 0.5 )*hc /**/);
+            // "+ 0.5" means cell center
+         
+            offsetX[n] = y1*(features.cols/shrink)*channels + x1*channels + (i%channels);
+            offsetY[n] = y2*(features.cols/shrink)*channels + x2*channels + (i%channels);
         }
     // lookup tables for mapping linear index to offset pairs
 
@@ -204,10 +212,6 @@ void StructuredEdgeDetection::__detectEdges
            indexes.data[i*height*channels + j*channels + k] = currentNode;
        }
     }
-
-    delete [] offsetI;
-    delete [] offsetX;
-    delete [] offsetY;
 
     ...
 }
