@@ -121,6 +121,7 @@ MEXFUNCTION_LINKAGE void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const 
 
     cv::Mat src = MxArray(prhs[0]).toMat(); 
     src.convertTo(src, cv::DataType<float>::type);
+    cv::cvtColor(src, src, CV_BGR2RGB);
 
     StructuredEdgeDetection img2edges;
 
