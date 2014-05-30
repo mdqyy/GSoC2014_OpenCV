@@ -15,6 +15,12 @@
 #  define CV_SQR(x)  ((x)*(x))
 #endif
 
+#define CV_INIT_VECTOR(type, name, ...) \
+    static const type name##_a[] = __VA_ARGS__; \
+    std::vector <type> name(name##_a, \
+    name##_a + sizeof(name##_a) / sizeof(*name##_a))
+
+#define CV_INC_IF_EVEN(x) ((x) + !((x)&1))
 
 typedef cv::Mat NChannelsMat;
 
@@ -27,27 +33,22 @@ struct RandomForestOptions
 
     int patchSize;      // width of image patches
     int patchInnerSize; // width of patch predicted part
-
     //----------------------------------------------------------
-    // training params
 
-    ...
-
-    //----------------------------------------------------------
     // feature params
 
     int regFeatureSmoothingRadius;    // radius for smoothing of regular features
-                                      // (using convolution with triangle filter
+    // (using convolution with triangle filter
 
     int ssFeatureSmoothingRadius;     // radius for smoothing of additional features
-                                      // (using convolution with triangle filter)
+    // (using convolution with triangle filter)
 
     int shrinkNumber;                 // amount to shrink channels
 
     int numberOfGradientOrientations; // number of orientations per gradient scale
 
     int gradientSmoothingRadius;      // radius for smoothing of gradients
-                                      // (using convolution with triangle filter)
+    // (using convolution with triangle filter)
 
     int gradientNormalizationRadius;  // gradient normalization radius
     int selfsimilarityGridSize;       // number of self similarity cells
@@ -67,12 +68,12 @@ struct RandomForest
 
     int numberOfTreeNodes;
 
-    std::vector <unsigned int> featureIds;     // feature coordinate thresholded at k-th node
-    std::vector <unsigned int> thresholds;     // threshold applied to featureIds[k] at k-th node
-    std::vector <unsigned int> childs;         // k --> child[k] - 1, child[k]
+    std::vector <int> featureIds;     // feature coordinate thresholded at k-th node
+    std::vector <float> thresholds;   // threshold applied to featureIds[k] at k-th node
+    std::vector <int> childs;         // k --> child[k] - 1, child[k]
 
-    std::vector <unsigned int> edgeBoundaries; // ...
-    std::vector <unsigned int> edgeBins;       // ...
+    std::vector <int> edgeBoundaries; // ...
+    std::vector <int> edgeBins;       // ...
 };
 
 class StructuredEdgeDetection
@@ -80,17 +81,17 @@ class StructuredEdgeDetection
 public:
     RandomForest __rf; // random forest trained to detect edges
 
-    cv::Mat __imresize(const cv::Mat &src, const cv::Size &sizeDst);
+    cv::Mat __imresize(const cv::Mat &img, const cv::Size &sizeDst);
     cv::Mat __imsmooth(const cv::Mat &img, const int rad);
     // image smoothing, authors used triangle convolution
 
     void __imhog(const cv::Mat &img, cv::Mat &magnitude, cv::Mat &histogram,
-                 const int numberOfBins, const int sizeOfPatch,
-                 const int gradientNormalizationRadius);
+        const int numberOfBins, const int sizeOfPatch,
+        const int gradientNormalizationRadius);
     // gradient magnitude, histogram of gradient orientations
 
     void __getFeatures(const cv::Mat &img, NChannelsMat &features);
-    // extracting features for __classifier from img
+    // extracting features for __rf from img
 
     void __detectEdges(const NChannelsMat &features, cv::Mat &dst);
     // edge detection
@@ -104,17 +105,8 @@ public:
     void detectMultipleScales(cv::InputArray src, cv::OutputArray dst);
     // detect edges in {0.5, 1, and 2}-times scaled source image, then average
 
-    void train(); // ...
-
-    void save(const std::string &filename);
-    // serialize options and __classifier into filename
-
-    void load(const std::string &filename);
-    // load options and __classifier from filename
-
-    StructuredEdgeDetection();
     StructuredEdgeDetection(const std::string &filename);
-    // load options and __classifier from filename
+    // load options and forest from filename
 
     virtual ~StructuredEdgeDetection() {};
 };

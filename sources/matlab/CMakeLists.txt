@@ -7,14 +7,16 @@ find_package(MATLAB REQUIRED QUIET)
 add_subdirectory(../algorithms ${CMAKE_CURRENT_BINARY_DIR}/libs)
 include_directories(${ALG_INCLUDE_DIRS})
 
-add_library(structuredEdgeDetection MODULE structuredEdgeDetection.cpp thirdparty/MxArray.cpp)
+add_library(getFChannels MODULE getFChannels.cpp thirdparty/MxArray.cpp)
+add_library(predictEdges MODULE predictEdges.cpp thirdparty/MxArray.cpp)
 
-target_link_libraries(structuredEdgeDetection ${ALG_LIBS} ${OpenCV_LIBS} ${MATLAB_LIBS})
+target_link_libraries(getFChannels ${ALG_LIBS} ${OpenCV_LIBS} ${MATLAB_LIBS})
+target_link_libraries(predictEdges ${ALG_LIBS} ${OpenCV_LIBS} ${MATLAB_LIBS})
 
-set_target_properties(structuredEdgeDetection
+set_target_properties(getFChannels predictEdges
                       PROPERTIES SUFFIX "${MATLAB_MEXEXT}")
 
-set_target_properties(structuredEdgeDetection
+set_target_properties(getFChannels predictEdges
                       PROPERTIES PREFIX "")
 
 if (NOT DEFINED copyTo)

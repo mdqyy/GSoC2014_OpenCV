@@ -1,87 +1,85 @@
 /** Implemenation of MxArray.
- * @file MxArray.cpp
- * @author Kota Yamaguchi
- * @date 2012
- */
+* @file MxArray.cpp
+* @author Kota Yamaguchi
+* @date 2012
+*/
 #include "MxArray.h"
 
 namespace { // namespace
+    /** Field names for cv::Moments.
+    */
+    const char *cv_moments_fields[10] = {"m00", "m10", "m01", "m20", "m11", "m02",
+        "m30", "m21", "m12", "m03"};
+    /** Field names for cv::RotatedRect.
+    */
+    const char *cv_rotated_rect_fields[3] = {"center", "size", "angle"};
+    /** Field names for cv::TermCriteria.
+    */
+    const char *cv_term_criteria_fields[3] = {"type", "maxCount", "epsilon"};
+    /** Field names for cv::Keypoint.
+    */
+    const char *cv_keypoint_fields[6] = {"pt", "size", "angle", "response",
+        "octave", "class_id"};
+    /** Field names for cv::DMatch.
+    */
+    const char *cv_dmatch_fields[4] = {"queryIdx", "trainIdx", "imgIdx",
+        "distance"};
 
-/** Field names for cv::Moments.
- */
-const char *cv_moments_fields[10] = {"m00", "m10", "m01", "m20", "m11", "m02",
-                                     "m30", "m21", "m12", "m03"};
-/** Field names for cv::RotatedRect.
- */
-const char *cv_rotated_rect_fields[3] = {"center", "size", "angle"};
-/** Field names for cv::TermCriteria.
- */
-const char *cv_term_criteria_fields[3] = {"type", "maxCount", "epsilon"};
-/** Field names for cv::Keypoint.
- */
-const char *cv_keypoint_fields[6] = {"pt", "size", "angle", "response",
-                                     "octave", "class_id"};
-/** Field names for cv::DMatch.
- */
-const char *cv_dmatch_fields[4] = {"queryIdx", "trainIdx", "imgIdx",
-                                   "distance"};
+    /** Translates data type definition used in OpenCV to that of Matlab.
+    * @param classid data type of matlab's mxArray. e.g., mxDOUBLE_CLASS.
+    * @return opencv's data type. e.g., CV_8U.
+    */
+    const ConstMap<mxClassID, int> DepthOf = ConstMap<mxClassID, int>
+        (mxDOUBLE_CLASS,   CV_64F)
+        (mxSINGLE_CLASS,   CV_32F)
+        (mxINT8_CLASS,     CV_8S)
+        (mxUINT8_CLASS,    CV_8U)
+        (mxINT16_CLASS,    CV_16S)
+        (mxUINT16_CLASS,   CV_16U)
+        (mxINT32_CLASS,    CV_32S)
+        (mxUINT32_CLASS,   CV_32S)
+        (mxLOGICAL_CLASS,  CV_8U);
 
-/** Translates data type definition used in OpenCV to that of Matlab.
- * @param classid data type of matlab's mxArray. e.g., mxDOUBLE_CLASS.
- * @return opencv's data type. e.g., CV_8U.
- */
-const ConstMap<mxClassID, int> DepthOf = ConstMap<mxClassID, int>
-    (mxDOUBLE_CLASS,   CV_64F)
-    (mxSINGLE_CLASS,   CV_32F)
-    (mxINT8_CLASS,     CV_8S)
-    (mxUINT8_CLASS,    CV_8U)
-    (mxINT16_CLASS,    CV_16S)
-    (mxUINT16_CLASS,   CV_16U)
-    (mxINT32_CLASS,    CV_32S)
-    (mxUINT32_CLASS,   CV_32S)
-    (mxLOGICAL_CLASS,  CV_8U);
+    /** Translates data type definition used in Matlab to that of OpenCV.
+    * @param depth data depth of opencv's Mat class. e.g., CV_32F.
+    * @return data type of matlab's mxArray. e.g., mxDOUBLE_CLASS.
+    */
+    const ConstMap<int,mxClassID> ClassIDOf = ConstMap<int,mxClassID>
+        (CV_64F,    mxDOUBLE_CLASS)
+        (CV_32F,    mxSINGLE_CLASS)
+        (CV_8S,     mxINT8_CLASS)
+        (CV_8U,     mxUINT8_CLASS)
+        (CV_16S,    mxINT16_CLASS)
+        (CV_16U,    mxUINT16_CLASS)
+        (CV_32S,    mxINT32_CLASS);
 
-/** Translates data type definition used in Matlab to that of OpenCV.
- * @param depth data depth of opencv's Mat class. e.g., CV_32F.
- * @return data type of matlab's mxArray. e.g., mxDOUBLE_CLASS.
- */
-const ConstMap<int,mxClassID> ClassIDOf = ConstMap<int,mxClassID>
-    (CV_64F,    mxDOUBLE_CLASS)
-    (CV_32F,    mxSINGLE_CLASS)
-    (CV_8S,     mxINT8_CLASS)
-    (CV_8U,     mxUINT8_CLASS)
-    (CV_16S,    mxINT16_CLASS)
-    (CV_16U,    mxUINT16_CLASS)
-    (CV_32S,    mxINT32_CLASS);
+    /** Comparison operator for sparse matrix elements.
+    */
+    struct CompareSparseMatNode {
+        bool operator () (const cv::SparseMat::Node* lhs,
+            const cv::SparseMat::Node* rhs)
+        {
+            if (lhs->idx[1] < rhs->idx[1]) // column index
+                return true;
+            if (lhs->idx[1] == rhs->idx[1] && lhs->idx[0] < rhs->idx[0]) // row index
+                return true;
+            return false;
+        }
+    };
 
-/** Comparison operator for sparse matrix elements.
- */
-struct CompareSparseMatNode {
-    bool operator () (const cv::SparseMat::Node* lhs,
-                      const cv::SparseMat::Node* rhs)
-    {
-        if (lhs->idx[1] < rhs->idx[1]) // column index
-            return true;
-        if (lhs->idx[1] == rhs->idx[1] && lhs->idx[0] < rhs->idx[0]) // row index
-            return true;
-        return false;
-    }
-};
+    /** InvTermCritType map for option processing.
+    */
+    const ConstMap<int, std::string> InvTermCritType = ConstMap<int, std::string>
+        (cv::TermCriteria::COUNT, "Count")
+        (cv::TermCriteria::EPS,   "EPS")
+        (cv::TermCriteria::COUNT+cv::TermCriteria::EPS, "Count+EPS");
 
-/** InvTermCritType map for option processing.
- */
-const ConstMap<int, std::string> InvTermCritType = ConstMap<int, std::string>
-    (cv::TermCriteria::COUNT, "Count")
-    (cv::TermCriteria::EPS,   "EPS")
-    (cv::TermCriteria::COUNT+cv::TermCriteria::EPS, "Count+EPS");
-
-/** TermCritType map for option processing.
- */
-const ConstMap<std::string, int> TermCritType = ConstMap<std::string, int>
-    ("Count",     cv::TermCriteria::COUNT)
-    ("EPS",       cv::TermCriteria::EPS)
-    ("Count+EPS", cv::TermCriteria::COUNT+cv::TermCriteria::EPS);
-
+    /** TermCritType map for option processing.
+    */
+    const ConstMap<std::string, int> TermCritType = ConstMap<std::string, int>
+        ("Count",     cv::TermCriteria::COUNT)
+        ("EPS",       cv::TermCriteria::EPS)
+        ("Count+EPS", cv::TermCriteria::COUNT+cv::TermCriteria::EPS);
 }  // namespace
 
 MxArray& MxArray::operator=(const MxArray& rhs)
@@ -125,11 +123,14 @@ MxArray::MxArray(const cv::Mat& mat, mxClassID classid, bool transpose)
             mexErrMsgIdAndTxt("mexopencv:error", "Allocation error");
         return;
     }
-    cv::Mat input = (mat.dims == 2 && transpose) ? mat.t() : mat;
+
+    cv::Mat input= mat;// = (mat.dims == 2 && transpose) ? mat.t() : mat;
+
     // Create a new mxArray.
     const int nchannels = input.channels();
-    const int* dims_ = input.size;
-    std::vector<mwSize> d(dims_, dims_ + input.dims);
+
+    std::vector<mwSize> d;
+    std::reverse_copy(input.size + 0, input.size + input.dims, std::back_inserter(d));
     d.push_back(nchannels);
     classid = (classid == mxUNKNOWN_CLASS)
         ? ClassIDOf[input.depth()] : classid;
@@ -155,10 +156,19 @@ MxArray::MxArray(const cv::Mat& mat, mxClassID classid, bool transpose)
     {
         si[si.size() - 1] = i; // last dim is a channel index.
         void *ptr = reinterpret_cast<void*>(
-                reinterpret_cast<size_t>(mxGetData(p_)) +
-                mxGetElementSize(p_) * subs(si));
-        cv::Mat m(input.dims, dims_, type, ptr);
-        channels[i].convertTo(m, type); // Write to mxArray through m.
+            reinterpret_cast<size_t>(mxGetData(p_)) +
+            mxGetElementSize(p_) * subs(si));
+
+        std::vector <int> dims_(d.begin(), d.end());
+        std::swap(dims_[0], dims_[1]);
+        cv::Mat m(input.dims, (const int *) &dims_[0], type, ptr);
+        if (transpose)
+        {
+            cv::Mat tchannels = channels[i].t();
+            tchannels.convertTo(m, type); // Write to mxArray through m.
+        }
+        else
+            channels[i].convertTo(m, type); // Write to mxArray through m.
     }
 }
 
@@ -188,7 +198,7 @@ MxArray::MxArray(const cv::SparseMat& mat)
     int i = 0;
     jc[0] = 0;
     for (std::vector<const cv::SparseMat::Node*>::const_iterator
-         it = nodes.begin(); it != nodes.end(); ++it)
+        it = nodes.begin(); it != nodes.end(); ++it)
     {
         mwIndex row = (*it)->idx[0], col = (*it)->idx[1];
         ir[i] = row;
@@ -341,8 +351,8 @@ cv::Mat MxArray::toMat(int depth, bool transpose) const
     {
         si[d.size()-1] = i;
         void *pd = reinterpret_cast<void*>(
-                reinterpret_cast<size_t>(mxGetData(p_))+
-                mxGetElementSize(p_)*subs(si));
+            reinterpret_cast<size_t>(mxGetData(p_))+
+            mxGetElementSize(p_)*subs(si));
         cv::Mat m(ndims, &d[0], type, pd);
         // Read from mxArray through m
         m.convertTo(channels[i], CV_MAKETYPE(depth, 1));
@@ -357,7 +367,7 @@ cv::MatND MxArray::toMatND(int depth, bool transpose) const
     std::vector<int> d(dims(), dims()+ndims());
     std::swap(d[0], d[1]);
     cv::MatND m(ndims(), &d[0], CV_MAKETYPE(DepthOf[classID()], 1),
-                mxGetData(p_));
+        mxGetData(p_));
     // Copy.
     cv::MatND mat;
     depth = (depth==CV_USRTYPE1) ? CV_MAKETYPE(DepthOf[classID()], 1) : depth;
@@ -403,7 +413,7 @@ cv::Moments MxArray::toMoments(mwIndex index) const
         (isField("m12")) ? at("m12", index).toDouble() : 0,
         (isField("m21")) ? at("m21", index).toDouble() : 0,
         (isField("m03")) ? at("m03", index).toDouble() : 0
-    );
+        );
 }
 
 cv::KeyPoint MxArray::toKeyPoint(mwIndex index) const
@@ -415,7 +425,7 @@ cv::KeyPoint MxArray::toKeyPoint(mwIndex index) const
         (isField("response")) ? at("response", index).toDouble() :  0,
         (isField("octave"))   ? at("octave",   index).toInt()    :  0,
         (isField("class_id")) ? at("class_id", index).toInt()    : -1
-    );
+        );
 }
 
 cv::DMatch MxArray::toDMatch(mwIndex index) const
@@ -425,7 +435,7 @@ cv::DMatch MxArray::toDMatch(mwIndex index) const
         (isField("trainIdx")) ? at("trainIdx", index).toInt()    : 0,
         (isField("imgIdx"))   ? at("imgIdx",   index).toInt()    : 0,
         (isField("distance")) ? at("distance", index).toDouble() : 0
-    );
+        );
 }
 
 cv::Range MxArray::toRange() const
@@ -447,7 +457,7 @@ cv::TermCriteria MxArray::toTermCriteria(mwIndex index) const
         (_type.isChar()) ? TermCritType[_type.toString()] : _type.toInt(),
         at("maxCount", index).toInt(),
         at("epsilon", index).toDouble()
-    );
+        );
 }
 
 std::string MxArray::fieldname(int index) const
@@ -455,7 +465,7 @@ std::string MxArray::fieldname(int index) const
     const char *f = mxGetFieldNameByNumber(p_, index);
     if (!f)
         mexErrMsgIdAndTxt("mexopencv:error",
-                          "Failed to get field name at %d\n", index);
+        "Failed to get field name at %d\n", index);
     return std::string(f);
 }
 
@@ -493,8 +503,8 @@ MxArray MxArray::at(const std::string& fieldName, mwIndex index) const
     mxArray* pm = mxGetField(p_, index, fieldName.c_str());
     if (!pm)
         mexErrMsgIdAndTxt("mexopencv:error",
-                          "Field '%s' doesn't exist",
-                          fieldName.c_str());
+        "Field '%s' doesn't exist",
+        fieldName.c_str());
     return MxArray(pm);
 }
 
@@ -514,7 +524,7 @@ void MxArray::set(mwIndex index, const MxArray& value)
     if (!isCell())
         mexErrMsgIdAndTxt("mexopencv:error", "Not cell array");
     mxSetCell(const_cast<mxArray*>(p_), index,
-              static_cast<mxArray*>(value));
+        static_cast<mxArray*>(value));
 }
 
 template <>
@@ -586,7 +596,7 @@ std::vector<cv::KeyPoint> MxArray::toVector() const
             v.push_back(toKeyPoint(i));
     else
         mexErrMsgIdAndTxt("mexopencv:error",
-                          "MxArray unable to convert to std::vector");
+        "MxArray unable to convert to std::vector");
     return v;
 }
 
@@ -604,6 +614,6 @@ std::vector<cv::DMatch> MxArray::toVector() const
             v.push_back(toDMatch(i));
     else
         mexErrMsgIdAndTxt("mexopencv:error",
-                          "MxArray unable to convert to std::vector");
+        "MxArray unable to convert to std::vector");
     return v;
 }
