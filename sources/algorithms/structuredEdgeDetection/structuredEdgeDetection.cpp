@@ -66,10 +66,8 @@ void StructuredEdgeDetection::__imhog
 
         for (int j = 0; j < phase.cols; ++j)
         {
-            float angle = anglePtr[j]*numberOfBins;
-
             int index = cvFloor(/**/ ((j/sizeOfPatch)
-                + angle/(2*CV_PI))*numberOfBins /**/);
+                + anglePtr[j]/(2*CV_PI))*numberOfBins /**/);
             histPtr[index] += lengthPtr[j];
         }
     }
@@ -142,7 +140,7 @@ void StructuredEdgeDetection::__detectEdges
 
     const int height = cvCeil( double(features.rows*shrink - pSize) / stride );
     const int width  = cvCeil( double(features.cols*shrink - pSize) / stride );
-    // image size in patches
+    // image size in patches with overlapping
 
     //-------------------------------------------------------------------------
 
@@ -160,6 +158,16 @@ void StructuredEdgeDetection::__detectEdges
         offsetI[i] = y*(features.cols/shrink)*channels + x*channels + (i%channels);
     }
     // lookup table for mapping linear index to offsets
+
+    //std::vector <int> offsetE(/**/ CV_SQR(ipSize)*outNum, 0);
+    //for (int i = 0; i < CV_SQR(ipSize)*outNum; ++i)
+    //{
+    //    int x = i/outNum%(ipSize);
+    //    int y = i/outNum/(ipSize);
+    //
+    //    offsetE[i] = y*(.../shrink)*outNum + x*outNum + (i%outNum);
+    //}
+    //// lookup table for mapping linear index to offsets
 
     std::vector <int> offsetX( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0);
     std::vector <int> offsetY( CV_SQR(gridSize)*(CV_SQR(gridSize) - 1)*channels, 0);
@@ -225,23 +233,31 @@ void StructuredEdgeDetection::__detectEdges
             }
         }
 
-        dst.create(features.size(), CV_MAKETYPE(cv::DataType<float>::type, outNum));
-
-        for (int i = 0; i < height; ++i)
-        {
-            int *indexPtr = indexes.ptr<int>(i);
-
-            for (int j = 0, k = 0; j < width; ++k, j += !(k %= nTreesEval))
-            {// for j,k in [0;width)x[0;nTreesEval)
-
-                int currentNode = indexPtr[j*channels + k];
-                float *E1 = E + (r*stride) + (c*stride)*h2;
-                int b0=eBnds[k], b1=eBnds[k+1]; if(b0==b1) continue;
-                for( int b=b0; b<b1; b++ ) E1[eids[eBins[b]]]++;
-            }
-        }
-
-        dst *= 2.0f * CV_SQR(stride) / CV_SQR(ipSize) / nTreesEval;
+        //dst.create(nSize, CV_MAKETYPE(cv::DataType<float>::type, outNum));
+        //
+        //for (int i = 0; i < height; ++i)
+        //{
+        //    int *indexPtr = indexes.ptr<int>(i);
+        //    float *dstPtr = dst.ptr<float>(i*stride)
+        //
+        //        for (int j = 0, k = 0; j < width; ++k, j += !(k %= nTreesEval))
+        //        {// for j,k in [0;width)x[0;nTreesEval)
+        //
+        //            int currentNode = indexPtr[j*channels + k];
+        //            ;//float *E1 = E + (r*stride) + (c*stride)*h2;
+        //
+        //            int start  = __rf.edgeBoundaries[currentNode];
+        //            int finish = __rf.edgeBoundaries[currentNode + 1];
+        //
+        //            if (start == finish)
+        //                continue;
+        //
+        //            for (int p = start; p < finish; +p)
+        //                ;//E1[eids[eBins[b]]]++;
+        //        }
+        //}
+        //
+        //dst *= 2.0f * CV_SQR(stride) / CV_SQR(ipSize) / nTreesEval;
 }
 
 void StructuredEdgeDetection::detectSingleScale
@@ -335,24 +351,24 @@ StructuredEdgeDetection::StructuredEdgeDetection(const std::string &filename)
             std::back_inserter(__rf.thresholds));
     }
 
-    cv::FileNode edgeBoundaries = modelFile["edgeBoundaries"];
-    cv::FileNode edgeBins = modelFile["edgeBins"];
-
-    for(cv::FileNodeIterator it = edgeBoundaries.begin();
-        it != edgeBoundaries.end(); ++it)
-    {
-        (*it) >> currentTree;
-        std::copy(currentTree.begin(), currentTree.end(),
-            std::back_inserter(__rf.edgeBoundaries));
-    }
-
-    for(cv::FileNodeIterator it = edgeBins.begin();
-        it != edgeBins.end(); ++it)
-    {
-        (*it) >> currentTree;
-        std::copy(currentTree.begin(), currentTree.end(),
-            std::back_inserter(__rf.edgeBins));
-    }
+    //cv::FileNode edgeBoundaries = modelFile["edgeBoundaries"];
+    //cv::FileNode edgeBins = modelFile["edgeBins"];
+    //
+    //for(cv::FileNodeIterator it = edgeBoundaries.begin();
+    //    it != edgeBoundaries.end(); ++it)
+    //{
+    //    (*it) >> currentTree;
+    //    std::copy(currentTree.begin(), currentTree.end(),
+    //        std::back_inserter(__rf.edgeBoundaries));
+    //}
+    //
+    //for(cv::FileNodeIterator it = edgeBins.begin();
+    //    it != edgeBins.end(); ++it)
+    //{
+    //    (*it) >> currentTree;
+    //    std::copy(currentTree.begin(), currentTree.end(),
+    //        std::back_inserter(__rf.edgeBins));
+    //}
 
     __rf.numberOfTreeNodes = int( __rf.childs.size() ) / __rf.options.numberOfTrees;
 }
